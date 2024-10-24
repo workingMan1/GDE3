@@ -11,7 +11,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="panel-body">
+                        <!-- <div class="panel-body">
                             <div class="custom-file-container" data-upload-id="myFirstImage">
                                 <label>Upload (Single File) <a href="javascript:void(0)"
                                         class="custom-file-container__image-clear" title="Clear Image">x</a></label>
@@ -23,7 +23,7 @@
                                 </label>
                                 <div class="custom-file-container__image-preview" style="display: none;"></div>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>
@@ -150,7 +150,16 @@ import { useStore } from 'vuex';
 const store = useStore();
 
 onMounted(() => {
-    new FileUploadWithPreview('myFirstImage');
+    const defaultFilePath = '/datos.xlsx'; // Ruta relativa al archivo en el directorio 'public'
+    fetch(defaultFilePath)
+        .then(response => response.arrayBuffer())
+        .then(data => {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            excelDataTemp.value = XLSX.utils.sheet_to_json(worksheet);
+            excelDataOriginal.value = [...excelDataTemp.value];
+        });
+   
 });
 
 // Encabezados de la tabla con la nueva columna de 'Start Date'
@@ -164,18 +173,20 @@ const columns = ref([
 
 const columnsDataProgram = ref([
     'Program',
-    'Total',
-    'Graduate',
-    'Dropped',
-    'Enrolled',
-    'Placement'
-]);
-const columnsDataProgramByDate = ref([
-    'Initial Date',
-    'Total',
+    'Started',
     'Graduated',
     'Dropped',
-    'Enrolled',
+    'Active',
+    'Available for Placement'
+]);
+
+
+const columnsDataProgramByDate = ref([
+    'Initial Date',
+    'Started',
+    'Graduated',
+    'Dropped',
+    'Active',
 ]);
 
 const report_date = ref("2025-07-01"); // Fecha final seleccionada
@@ -234,7 +245,9 @@ const table_option = ref({
     perPageValues: [5, 10, 20, 50],
     skin: 'table',
     pagination: { nav: 'scroll', chunk: 5 },
-    sortable: ['Student', 'Program', 'Status', 'Term Started'],
+    sortable: ['Student', 'Program', 'Status',  'Start Date'],
+    
+
 });
 const table_option2 = ref({
     perPage: 5,
@@ -289,10 +302,10 @@ const generateData = () => {
     filteredDates.forEach(date => {
         itemsDataByDate.value.push({
             'Initial Date': date.toISOString().split('T')[0], // Convertir la fecha al formato YYYY-MM-DD
-            'Total': 0, // Valores por defecto para empezar
+            'Started': 0, // Valores por defecto para empezar
             'Graduated': 0,
             'Dropped': 0,
-            'Enrolled': 0
+            'Active': 0
         });
     });
 
@@ -425,11 +438,11 @@ const generateData = () => {
             // Añadir los datos finales del programa a la tabla
             itemsData.value.push({
                 Program: selectedProgram,
-                Total: graduateCount + dropCount + enrolledCount,
-                Graduate: graduateCount,
+                Started: graduateCount + dropCount + enrolledCount,
+                Graduated: graduateCount,
                 Dropped: dropCount,
-                Enrolled: enrolledCount,
-                Placement: placementCount  // Valor de Placement ya corregido
+                Active: enrolledCount,
+                'Available for Placement': placementCount  // Valor de Placement ya corregido
             });
         });
 
@@ -455,22 +468,22 @@ const generateData = () => {
 
         if (existingDateEntry) {
             // Si la fecha ya existe, actualizamos los contadores
-            existingDateEntry.Total++;
+            existingDateEntry.Started++;
             if (item.Status === 'Graduated') {
                 existingDateEntry.Graduated++;
             } else if (item.Status === 'Dropped') {
                 existingDateEntry.Dropped++;
             } else if (item.Status === 'Enroll') {
-                existingDateEntry.Enrolled++;
+                existingDateEntry.Active++;
             }
         } else {
             // Si la fecha no existe, añadimos un nuevo objeto con esa fecha
             dateGroupedData.push({
                 'Initial Date': startDate,
-                'Total': 1, // Empezamos con 1 porque es el primer estudiante en esa fecha
+                'Started': 1, // Empezamos con 1 porque es el primer estudiante en esa fecha
                 'Graduated': item.Status === 'Graduated' ? 1 : 0,
                 'Dropped': item.Status === 'Dropped' ? 1 : 0,
-                'Enrolled': item.Status === 'Enroll' ? 1 : 0
+                'Active': item.Status === 'Enroll' ? 1 : 0
             });
         }
     });
@@ -500,13 +513,13 @@ const exportToExcel = () => {
     // Valores dinámicos que vamos a usar
     const selectedProgram = program.value;  // Asumo que 'program.value' es el programa seleccionado
     const totals = itemsData.value.reduce((totals, item) => {
-        totals.total += item.Total;
-        totals.graduate += item.Graduate;
+        totals.started += item.Started;
+        totals.graduated += item.Graduated;
         totals.dropped += item.Dropped;
-        totals.enrolled += item.Enrolled;
+        totals.active += item.Active;
         totals.placement += item.Placement;
         return totals;
-    }, { total: 0, graduate: 0, dropped: 0, enrolled: 0, placement: 0 });
+    }, { started: 0, graduated: 0, dropped: 0, active: 0, placement: 0 });
 
     const ws = XLSX.utils.aoa_to_sheet([
         [], // Fila vacía
@@ -520,7 +533,7 @@ const exportToExcel = () => {
         [], // Fila vacía
         ['Program:', selectedProgram], // Mostrar el programa seleccionado
         ['', '', '', 'Total', 'Graduate', 'Dropped', 'Enrolled', 'Placement'], // Encabezados desde E9 en adelante
-        ['', '', '', totals.total, totals.graduate, totals.dropped, totals.enrolled, totals.placement] // Totales debajo de los encabezados
+        ['', '', '', totals.total, totals.graduated, totals.dropped, totals.enrolled, totals.placement] // Totales debajo de los encabezados
     ]);
 
     // Añadir la hoja al libro de trabajo
