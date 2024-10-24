@@ -150,7 +150,7 @@ import { useStore } from 'vuex';
 const store = useStore();
 
 onMounted(() => {
-    const defaultFilePath = 'datos.xlsx'; // Ruta relativa al archivo en el directorio 'public'
+    const defaultFilePath = '/GED3/datos.xlsx'; // Ruta relativa al archivo en el directorio 'public'
     fetch(defaultFilePath)
         .then(response => response.arrayBuffer())
         .then(data => {
