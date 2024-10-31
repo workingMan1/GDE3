@@ -11,19 +11,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- <div class="panel-body">
-                            <div class="custom-file-container" data-upload-id="myFirstImage">
-                                <label>Upload (Single File) <a href="javascript:void(0)"
-                                        class="custom-file-container__image-clear" title="Clear Image">x</a></label>
-                                <label class="custom-file-container__custom-file">
-                                    <input type="file" class="custom-file-container__custom-file__custom-file-input"
-                                        accept=".xlsx, .xls" @change="handleFileUpload" />
-                                    <input type="hidden" name="MAX_FILE_SIZE" value="10485760" />
-                                    <span class="custom-file-container__custom-file__custom-file-control"></span>
-                                </label>
-                                <div class="custom-file-container__image-preview" style="display: none;"></div>
-                            </div>
-                        </div> -->
                     </div>
                 </div>
             </div>
@@ -73,7 +60,7 @@
             <div class="row">
                 <div class="col-md-12 panel-body statbox box box-shadow d-flex justify-content-end">
 
-                    <button  type="button"  @click="exportToExcel"  class="btn btn-success btn-lg mb-4 me-2">Export </button>
+                    <!-- <button  type="button"  @click="exportToExcel"  class="btn btn-success btn-lg mb-4 me-2">Export </button> -->
                     <button @click="generateData" type="button" class="btn btn-danger btn-lg mb-4 me-2">Generate</button>
                 </div>
             </div>
@@ -105,6 +92,9 @@
                     </div>
                 </div>
             </div>
+
+            <vue3-json-excel class="btn btn-primary m-1" name="table.xls" :fields="excel_columns()" :json-data="excel_items()">Export</vue3-json-excel>
+
 
             <!-- Tabla para mostrar los datos del nuevo Excel -->
             <div class="row layout-top-spacing">
@@ -150,7 +140,9 @@ import { useStore } from 'vuex';
 const store = useStore();
 
 onMounted(() => {
-    const defaultFilePath = '/GDE3/datos.xlsx'; // Ruta relativa al archivo en el directorio 'public'
+    const defaultFilePath = process.env.NODE_ENV === 'production'
+  ? '/GDE3/datos.xlsx'  // Para producción en GitHub Pages (reemplaza GDE3 por el nombre de tu repo)
+  : '/datos.xlsx';  // Para desarrollo local // Ruta relativa al archivo en el directorio 'public'
     fetch(defaultFilePath)
         .then(response => response.arrayBuffer())
         .then(data => {
@@ -164,6 +156,7 @@ onMounted(() => {
 
 // Encabezados de la tabla con la nueva columna de 'Start Date'
 const columns = ref([
+    'No',
     'Student',
     'Program',
     'Status',
@@ -241,7 +234,7 @@ const initial_date = computed(() => {
 
 // Opciones de la tabla
 const table_option = ref({
-    perPage: 5,
+    perPage: 10,
     perPageValues: [5, 10, 20, 50],
     skin: 'table',
     pagination: { nav: 'scroll', chunk: 5 },
@@ -250,34 +243,16 @@ const table_option = ref({
 
 });
 const table_option2 = ref({
-    perPage: 5,
+    perPage: 10,
     perPageValues: [5, 10, 20, 50],
     skin: 'table',
     pagination: { nav: 'scroll', chunk: 5 },
-
+    sortable: [],
 });
 
 const excelDataOriginal = ref([]);  // Variable para almacenar una copia de todos los datos originales del Excel
 
-// Función para manejar la carga de archivos y leer el Excel
-const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
 
-    reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-        // Guardar los datos del Excel en una variable temporal
-        excelDataTemp.value = XLSX.utils.sheet_to_json(worksheet);
-
-        // Hacer una copia de los datos originales del Excel para mantenerlos sin modificar
-        excelDataOriginal.value = [...excelDataTemp.value];  // Hacer una copia profunda de los datos
-    };
-
-    reader.readAsArrayBuffer(file);
-};
 
 const generateData = () => {
     items.value = [];  // Limpiar los datos previos
@@ -446,6 +421,12 @@ const generateData = () => {
             });
         });
 
+        
+
+        filteredItems.forEach((item, index) => {
+                 item['No'] = index + 1;  // Asigna números consecutivos
+        });
+
         // Mostrar los estudiantes filtrados
         items.value = filteredItems;
 
@@ -491,6 +472,10 @@ const generateData = () => {
     // Asignar los datos agrupados a la tabla
     itemsDataByDate.value = dateGroupedData;
 
+    // Ordenar itemsDataByDate de menor a mayor por 'Initial Date'
+    itemsDataByDate.value.sort((a, b) => new Date(a['Initial Date']) - new Date(b['Initial Date']));
+
+
     // Mostrar los datos agrupados por fechas en la consola
     console.log('Datos agrupados por fecha:', itemsDataByDate.value);
 
@@ -502,46 +487,61 @@ console.log('Datos agrupados por fecha:', itemsDataByDate.value);
 };
 
 
+const excel_columns = () => {
+        return {
+            No: 'No',
+            Student: 'Student',
+            Program: 'Program',
+            Status: 'Status',
+            'Term Started': 'Term Started',
+            'Start Date ':'Start Date',
+
+        };
+    };
+    const excel_items = () => {
+        return items.value;
+    };
 
 
 
 
-const exportToExcel = () => {
-    // Crear un nuevo libro de trabajo y una hoja
-    const wb = XLSX.utils.book_new();
+
+// const exportToExcel = () => {
+//     // Crear un nuevo libro de trabajo y una hoja
+//     const wb = XLSX.utils.book_new();
     
-    // Valores dinámicos que vamos a usar
-    const selectedProgram = program.value;  // Asumo que 'program.value' es el programa seleccionado
-    const totals = itemsData.value.reduce((totals, item) => {
-        totals.started += item.Started;
-        totals.graduated += item.Graduated;
-        totals.dropped += item.Dropped;
-        totals.active += item.Active;
-        totals.placement += item.Placement;
-        return totals;
-    }, { started: 0, graduated: 0, dropped: 0, active: 0, placement: 0 });
+//     // Valores dinámicos que vamos a usar
+//     const selectedProgram = program.value;  // Asumo que 'program.value' es el programa seleccionado
+//     const totals = itemsData.value.reduce((totals, item) => {
+//         totals.started += item.Started;
+//         totals.graduated += item.Graduated;
+//         totals.dropped += item.Dropped;
+//         totals.active += item.Active;
+//         totals.placement += item.Placement;
+//         return totals;
+//     }, { started: 0, graduated: 0, dropped: 0, active: 0, placement: 0 });
 
-    const ws = XLSX.utils.aoa_to_sheet([
-        [], // Fila vacía
-        [], // Fila vacía
-        [], // Fila vacía
-        ['Date Report:', report_date.value],  // C4: Date Report
-        [], // Fila vacía
-        ['Program Length in Months:', months.value], // C5: Program Length in Months
-        [], // Fila vacía
-        ['Beginning Date:', initial_date.value, '', '', 'Ending Date:', final_date.value], // C6: Beginning Date en C6, Ending Date en F6
-        [], // Fila vacía
-        ['Program:', selectedProgram], // Mostrar el programa seleccionado
-        ['', '', '', 'Total', 'Graduate', 'Dropped', 'Enrolled', 'Placement'], // Encabezados desde E9 en adelante
-        ['', '', '', totals.total, totals.graduated, totals.dropped, totals.enrolled, totals.placement] // Totales debajo de los encabezados
-    ]);
+//     const ws = XLSX.utils.aoa_to_sheet([
+//         [], // Fila vacía
+//         [], // Fila vacía
+//         [], // Fila vacía
+//         ['Date Report:', report_date.value],  // C4: Date Report
+//         [], // Fila vacía
+//         ['Program Length in Months:', months.value], // C5: Program Length in Months
+//         [], // Fila vacía
+//         ['Beginning Date:', initial_date.value, '', '', 'Ending Date:', final_date.value], // C6: Beginning Date en C6, Ending Date en F6
+//         [], // Fila vacía
+//         ['Program:', selectedProgram], // Mostrar el programa seleccionado
+//         ['', '', '', 'Total', 'Graduate', 'Dropped', 'Enrolled', 'Placement'], // Encabezados desde E9 en adelante
+//         ['', '', '', totals.total, totals.graduated, totals.dropped, totals.enrolled, totals.placement] // Totales debajo de los encabezados
+//     ]);
 
-    // Añadir la hoja al libro de trabajo
-    XLSX.utils.book_append_sheet(wb, ws, "GraduationData");
+//     // Añadir la hoja al libro de trabajo
+//     XLSX.utils.book_append_sheet(wb, ws, "GraduationData");
 
-    // Descargar el archivo
-    XLSX.writeFile(wb, "GraduationData.xlsx");
-};
+//     // Descargar el archivo
+//     XLSX.writeFile(wb, "GraduationData.xlsx");
+// };
 
 
 

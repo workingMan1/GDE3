@@ -465,6 +465,12 @@ const routes = [
             import ( /* webpackChunkName: "forms-file-upload" */ '../views/forms/fileupload2.vue'),
     },
     {
+        path: '/forms/file-upload3',
+        name: 'file-upload3',
+        component: () =>
+            import ( /* webpackChunkName: "forms-file-upload" */ '../views/forms/fileupload3.vue'),
+    },
+    {
         path: '/forms/clipboard',
         name: 'clipboard',
         component: () =>
